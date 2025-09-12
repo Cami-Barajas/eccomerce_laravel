@@ -1,0 +1,26 @@
+#paymentModal {
+    border-radius: 15px;
+    border: none;
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    width: 80vh;
+    max-width: 90vw;
+    transform: translate(-50%, -50%);
+    padding-top: 60px;
+    padding-bottom: 20px;
+    box-sizing: border-box;
+   
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+#partPay{
+    display: flex;
+    padding-top: 20px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+}
