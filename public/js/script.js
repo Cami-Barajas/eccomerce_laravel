@@ -62,7 +62,7 @@ function organizar_categoria () {
     <div class="product-txt">
     <h3>${p.name}</h3>
     <p>${p.description}</p>
-    <p class="precio">$${p.price}</p>
+    <p class="precio">$${p.price.toLocaleString('es-CO')}</p>
     ${botonAgregar}
     </div>
     </div>`
