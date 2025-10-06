@@ -27,7 +27,7 @@ Route::middleware(['auth', 'verified','rolemanager:admin'])->group(function () {
     Route::prefix('admin')->group(function () {
         Route::controller(adminController::class)->group(function () {
             Route::get('/dashboard', 'index')->name('admin');
-            Route::get('/dashboard/settings', 'history')->name('history');
+
 
         });
         Route::controller(adminProductController::class)->group(function () {
@@ -44,7 +44,7 @@ Route::middleware(['auth', 'verified','rolemanager:admin'])->group(function () {
             
         });
             Route::controller(HistorialCompraController::class)->group(function () {
-            Route::get('/historial/get', 'index')->name('order.history');
+            Route::get('/pedidos/historial', 'index')->name('order.history');
             
         });
     
