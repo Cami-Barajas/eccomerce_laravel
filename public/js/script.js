@@ -6,6 +6,42 @@ let productosAñadidos = JSON.parse(localStorage.getItem("productos_carrito")) |
 // Elementos del DOM
 const lista = document.querySelector("#lista-carrito tbody");
 const mostrar_total = document.getElementById("pag");
+const carritoDiv = document.getElementById("carrito"); // Referencia al contenedor del carrito
+
+/**
+ * Muestra u oculta el carrito (necesario para el onclick en el icono de la bolsa)
+ */
+function toggleCarrito() {
+    if (carritoDiv) {
+        // Alternar una clase visible (asegúrate de definir 'visible' en tu CSS para mostrar/ocultar #carrito)
+        carritoDiv.classList.toggle('visible'); 
+    }
+}
+
+/**
+ * Convierte un valor de peso a Kilogramos (kg)
+ * Se asume que el precio base (p.price) es por KG.
+ * @param {number} peso - El valor del peso.
+ * @param {string} unidad - La unidad de peso ('kg', 'lb', 'gr').
+ * @returns {number} El peso equivalente en Kilogramos.
+ */
+function convertirAPesoBase(peso, unidad) {
+    peso = parseFloat(peso);
+    if (isNaN(peso) || peso <= 0) return 0; // Manejar valores inválidos
+
+    switch (unidad) {
+        case 'kg':
+            return peso; 
+        case 'lb':
+            return peso * 0.453592; // 1 lb ≈ 0.45 kg
+        case 'gr':
+            return peso / 1000; // 1 gr = 0.001 kg
+        default:
+            return peso;
+    }
+}
+
+//-------------------------------------------------------------------
 
 /**
  * Llama a los productos desde el backend, inicializa el control de stock
@@ -14,17 +50,22 @@ const mostrar_total = document.getElementById("pag");
 async function llamarProductos() {
     try {
         // Simulación: Asume que el backend ahora devuelve productos con las propiedades necesarias
-        // Se asumen valores por defecto si no están en el producto original para la funcionalidad del carrito
-        const data = await (await fetch('/productos')).json();
+        // **Asegúrate de que esta ruta sea correcta para tu backend**
+        const response = await fetch('/productos');
+        if (!response.ok) {
+             throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        
         productos = data.map(p => ({
             ...p,
-            // Añade propiedades por defecto para el carrito si no existen en el producto del backend
-            peso: p.peso || 1.0, 
+            // Añade propiedades por defecto y asegura que sean números
+            peso: parseFloat(p.peso) || 1.0, 
             unidadPeso: p.unidadPeso || 'kg',
             marmoleo: p.marmoleo || 'medio',
             maduracion: p.maduracion || 'medio',
             valido: p.valido !== undefined ? p.valido : true,
-            contador: p.contador || 1 // contador para la cantidad/unidades, NO peso
+            contador: parseInt(p.contador) || 1 // contador para la cantidad/unidades
         }));
 
         await control_stock(); // Asegura que el carrito refleje el stock actual
@@ -38,17 +79,13 @@ async function llamarProductos() {
 llamarProductos();
 
 //-------------------------------------------------------------------
-
-/**
- * Organiza los productos en sus respectivas categorías del frontend.
- */
 function organizar_categoria() {
-    let clasico = productos.filter(p => p.category === "clasico");
-    productosFrontEnd(clasico, "product-cards-clasico");
-    let teconologia = productos.filter(p => p.category === "tecnologia");
-    productosFrontEnd(teconologia, "product-cards-tecnologia");
-    let deportivo = productos.filter(p => p.category === "deportivo");
-    productosFrontEnd(deportivo, "product-cards-deportivo");
+    let clasico = productos.filter(p => p.category === "carne-res");
+    productosFrontEnd(clasico, "product-cards-clasico")
+    let tecnologia = productos.filter(p => p.category === "carne-cerdo"); // Asumo que corregiste la variable de la categoría
+    productosFrontEnd(tecnologia, "product-cards-tecnologia")
+    let deportivo = productos.filter(p => p.category === "carne-pollo");
+    productosFrontEnd(deportivo, "product-cards-deportivo")
 }
 
 /**
@@ -88,24 +125,29 @@ function productosFrontEnd(productosByType, tag) {
 
 /**
  * Genera el HTML del carrito de compras basándose en `productosAñadidos`.
- * Adapta el diseño para reflejar las columnas Peso, Marmoleo y Maduración.
  */
 function mostrar_carrito() {
     let precioTotal = 0;
-    lista.innerHTML = ""; // Limpia la tabla
-    mostrar_total.innerHTML = ""; // Limpia el botón de pagar
+    lista.innerHTML = ""; // Limpia la tabla (AQUÍ ES DONDE SE BORRABA LA FILA DE EJEMPLO)
+    
+    // Configuración inicial del botón de pagar
+    if (productosAñadidos.length === 0) {
+        mostrar_total.className = "a-deshabilitado"; 
+        mostrar_total.innerHTML = `Pagar $0.00`;
+    } 
 
     productosAñadidos.forEach((producto, index) => {
-
         // Opciones para los select
         const unidades = ['kg', 'lb', 'gr'];
         const niveles = ['bajo', 'medio', 'alto'];
+        
+        const pesoActual = parseFloat(producto.peso) || 1.0; 
 
         // Genera el HTML para los selects de peso, marmoleo y maduración
         const selectPesoHTML = `
-            <input type="number" min="0.1" step="0.1" value="${producto.peso}" 
-                   style="width: 50px;" 
-                   onchange="actualizar_propiedad_carrito(${producto.id}, 'peso', this.value)">
+            <input type="number" min="0.1" step="0.1" value="${pesoActual}" 
+                    style="width: 50px;" 
+                    onchange="actualizar_propiedad_carrito(${producto.id}, 'peso', this.value)">
             <select onchange="actualizar_propiedad_carrito(${producto.id}, 'unidadPeso', this.value)">
                 ${unidades.map(u => `<option value="${u}" ${producto.unidadPeso === u ? 'selected' : ''}>${u}</option>`).join('')}
             </select>`;
@@ -120,23 +162,29 @@ function mostrar_carrito() {
                 ${niveles.map(n => `<option value="${n}" ${producto.maduracion === n ? 'selected' : ''}>${n}</option>`).join('')}
             </select>`;
 
-        // Botón de borrar adaptado a la estructura original (X como enlace)
+        // Botón de borrar con su funcionalidad
         const botonBorrarHTML = `<a href="#" class="borrar" data-id="${producto.id}" onclick="event.preventDefault(); eliminarDelCarrito(${index}, ${producto.id}, ${producto.contador})">X</a>`;
         
-        // Estilo condicional si no hay stock
         const rowClass = producto.valido === false ? 'producto-sin-stock' : '';
 
         const producto_carrito = document.createElement("tr");
         producto_carrito.className = rowClass;
 
-        // Estructura de la fila según el HTML provisto
+        // **CÁLCULO DEL SUBTOTAL**
+        // Calculamos el peso total para este item, convertido a la unidad base (kg)
+        const pesoEnKg = convertirAPesoBase(producto.peso, producto.unidadPeso);
+        // Subtotal = Precio_por_KG * Peso_del_corte_en_KG * Cantidad_de_cortes(contador)
+        const subtotal = producto.price * pesoEnKg * producto.contador;
+        precioTotal += subtotal;
+
+        // Estructura de la fila
         producto_carrito.innerHTML = `
             <td><img src="${producto.image}" width="50"></td>
             <td class="remover-nombre">${producto.name}</td>
             <td>${selectPesoHTML}</td>
             <td>${selectMarmoleoHTML}</td>
             <td>${selectMaduracionHTML}</td>
-            <td>$${producto.price.toFixed(2)}</td>
+            <td>$${producto.price.toFixed(2)} / kg</td>
             <td>
                 <div class="cantidad">
                     <i class="fa fa-minus" onclick="decrementar_cantidad(${producto.id})"></i>
@@ -146,25 +194,13 @@ function mostrar_carrito() {
             </td>
             <td>${botonBorrarHTML}</td>`;
 
-        // Cálculo del subtotal: Precio * Peso(kg, lb, gr) * Cantidad (unidades).
-        // Simplificado a Precio * Cantidad (se asume que 'price' ya es por la unidad de peso/unidad de conteo)
-        // Para cortes de carne, el precio suele ser por unidad de peso (e.g., kg) y se vende por peso * cantidad de cortes.
-        // Simplificaremos a Precio * Cantidad (contador) * Peso (en unidad principal, e.g. kg, asumiendo una conversión si no es kg)
-        // **Ajuste Importante**: La lógica de carrito original parece usar 'contador' como unidades y 'price' como precio por unidad.
-        // El nuevo HTML introduce 'Peso' (input + select), pero la columna 'Cantidad' con +/- todavía existe.
-        // Para mantener la consistencia con el código original, usaremos: `total = Precio * Contador (unidades)`
-        // Si quisieras usar el peso para el cálculo sería: `total = Precio_por_kg * Peso_en_kg * Contador_unidades`
-        // **Simplificando a Contador (unidades) solamente:**
-        let subtotal = producto.price * producto.contador;
-        precioTotal += subtotal;
-
         lista.appendChild(producto_carrito);
     });
 
     // Actualiza el botón de pagar
-    if (precioTotal === 0) {
+    if (precioTotal <= 0) { 
         mostrar_total.className = "a-deshabilitado";
-        mostrar_total.innerHTML = `Pagar`;
+        mostrar_total.innerHTML = `Pagar $0.00`;
     } else {
         mostrar_total.className = "btn-2";
         mostrar_total.innerHTML = `Pagar $${precioTotal.toLocaleString('es-CO', { minimumFractionDigits: 2 })}`;
@@ -185,14 +221,15 @@ mostrar_carrito();
 function actualizar_propiedad_carrito(id, propiedad, valor) {
     const productoEnCarrito = productosAñadidos.find(p => p.id === id);
     if (productoEnCarrito) {
-        // Asegura que el peso sea un número
+        // Asegura que el peso sea un número positivo
         if (propiedad === 'peso') {
-            productoEnCarrito[propiedad] = parseFloat(valor);
+            let nuevoPeso = parseFloat(valor);
+            productoEnCarrito[propiedad] = (nuevoPeso > 0) ? nuevoPeso : 0.1; 
         } else {
             productoEnCarrito[propiedad] = valor;
         }
 
-        // Vuelve a guardar y mostrar para actualizar el carrito visualmente
+        // Vuelve a guardar y mostrar para actualizar el carrito visualmente y el total
         localStorage.setItem("productos_carrito", JSON.stringify(productosAñadidos));
         mostrar_carrito();
     }
@@ -200,41 +237,35 @@ function actualizar_propiedad_carrito(id, propiedad, valor) {
 
 /**
  * Sincroniza el stock de los productos en el carrito con el stock global.
- * Esta función es esencial para manejar productos fuera de stock.
  */
 async function control_stock() {
-    // Si la lista de productos disponibles (productos) está vacía, no podemos controlar el stock
     if (productos.length === 0) return;
 
     productosAñadidos.forEach(element => {
         let producto_descontar = productos.find(p => p.id === element.id);
 
         if (!producto_descontar) {
-            // Producto en carrito que ya no existe en el catálogo
             element.valido = false;
             return;
         }
 
         if (producto_descontar.stock === 0) {
-            // Producto en carrito sin stock
             element.valido = false;
+            // Solo alerta si el estado cambia (para evitar spam)
             if (element.valido !== false) {
-                // Muestra la alerta solo si el estado es nuevo (opcional, para evitar spam de alerta)
-                Swal.fire({
+                 Swal.fire({
                     icon: "error",
                     title: "Oops...",
                     text: `El producto ${element.name} ya no tiene stock disponible.`,
                 });
             }
-            element.valido = false;
-
         } else if (element.contador > producto_descontar.stock) {
-            // La cantidad en el carrito excede el stock disponible
             const stockAnterior = producto_descontar.stock;
+            // Ajusta la cantidad del carrito al stock disponible
             element.contador = producto_descontar.stock;
-            producto_descontar.stock = 0; // Agota el stock restante
+            producto_descontar.stock = 0; 
             element.stock = producto_descontar.stock;
-            element.valido = true; // Sigue siendo válido, solo la cantidad fue ajustada
+            element.valido = true; 
             Swal.fire({
                 icon: "warning",
                 title: "Stock limitado",
@@ -261,7 +292,6 @@ function agregar_carrito(ident) {
     let repetido = productosAñadidos.find(look => look.id === ident);
 
     if (repetido) {
-        // Se puede cambiar esta notificación para permitir aumentar la cantidad directamente
         return notificacionAgregarAlCarrito("Producto ya en el carrito.");
     }
 
@@ -274,7 +304,6 @@ function agregar_carrito(ident) {
         ...seek,
         contador: 1, // Inicializa la cantidad en 1 unidad/pieza
         valido: true
-        // Las propiedades de peso, unidadPeso, marmoleo y maduración ya deberían estar en 'seek'
     };
     productosAñadidos.push(productoParaCarrito);
 
@@ -352,21 +381,19 @@ function decrementar_cantidad(id) {
         mostrar_carrito();
         organizar_categoria();
     } else if (encontrar && encontrar.contador === 1) {
-        // Opcional: Si el contador llega a 1, se podría preguntar si desea eliminar el producto.
-        // Por ahora, lo dejamos en 1 como el código original.
+        // En lugar de dejarlo en 1, puedes eliminarlo para ser más intuitivo en un carrito de compras.
+        // Pero mantendremos el comportamiento de tu código original (no hacer nada en 1).
         return;
     }
 }
 
 /**
  * Muestra una notificación temporal al agregar al carrito.
- * **Nota**: Asume que hay un elemento con ID 'notificacion' en el DOM.
  * @param {string} mensaje - Mensaje a mostrar.
  */
 function notificacionAgregarAlCarrito(mensaje = "Producto agregado correctamente") {
     let noti = document.getElementById("notificacion");
     if (!noti) {
-        // Si el elemento no existe, lo crea o simplemente hace un console.log
         console.log("Notificación:", mensaje);
         return;
     }
@@ -375,11 +402,10 @@ function notificacionAgregarAlCarrito(mensaje = "Producto agregado correctamente
     noti.style.display = "block";
     noti.style.opacity = "1";
 
-    clearTimeout(noti.timer); // Limpia cualquier temporizador anterior
+    clearTimeout(noti.timer); 
 
     noti.timer = setTimeout(() => {
         noti.style.opacity = "0";
-        // Ocultar después de la transición de opacidad si es necesario
         setTimeout(() => {
             noti.style.display = "none";
         }, 300); // Ajustar al tiempo de la transición CSS
@@ -391,23 +417,19 @@ function notificacionAgregarAlCarrito(mensaje = "Producto agregado correctamente
  */
 function vaciar_carrito() {
     if (confirm("¿Estás seguro de que quieres vaciar la cesta de compra?")) {
-        // Para devolver el stock: iteramos sobre los productos añadidos y ajustamos el stock global
+        // Devolver el stock
         productosAñadidos.forEach(item => {
             const productoOriginal = productos.find(p => p.id === item.id);
-            if (productoOriginal) {
-                // Solo devuelve el stock si el producto no estaba marcado como inválido (sin stock)
-                if (item.valido !== false) {
-                    // Sumamos la cantidad que estaba en el carrito
-                    productoOriginal.stock += item.contador;
-                }
+            if (productoOriginal && item.valido !== false) {
+                productoOriginal.stock += item.contador;
             }
         });
 
         productosAñadidos = [];
-        localStorage.removeItem("productos_carrito"); // Usamos removeItem para una limpieza total
+        localStorage.removeItem("productos_carrito"); 
 
-        mostrar_carrito(); // Actualiza la vista del carrito
-        organizar_categoria(); // Actualiza los botones de stock en el frontend
+        mostrar_carrito(); 
+        organizar_categoria(); 
     }
 }
 
@@ -424,7 +446,8 @@ function validar_productos() {
     if (producto_invalido) {
         return alert("Hay productos sin stock disponible en el carrito de compras. Por favor, elimínalos para continuar.");
     } else {
-        // Redirección simulada
-        window.location.href = "/proceso/compra";
+        // Aquí iría la lógica de redirección o inicio de pago
+        // window.location.href = "/proceso/compra";
+        alert("¡Proceso de pago iniciado! Total: " + mostrar_total.textContent.replace('Pagar ', ''));
     }
 }
