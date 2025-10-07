@@ -8,6 +8,19 @@ const lista = document.querySelector("#lista-carrito tbody");
 const mostrar_total = document.getElementById("pag");
 const carritoDiv = document.getElementById("carrito"); // Referencia al contenedor del carrito
 
+// **CORRECCIÓN CLAVE: CONEXIÓN DEL BOTÓN DE PAGO**
+// Aseguramos que al hacer click en el botón de "Pagar" se ejecute la validación.
+if (mostrar_total) {
+    mostrar_total.addEventListener('click', function(e) {
+        // Prevenir la acción por defecto del enlace (si está habilitado)
+        if (!this.classList.contains('a-deshabilitado')) {
+            e.preventDefault();
+            validar_productos();
+        }
+    });
+}
+
+
 /**
  * Muestra u oculta el carrito (necesario para el onclick en el icono de la bolsa)
  */
@@ -254,10 +267,10 @@ async function control_stock() {
             // Solo alerta si el estado cambia (para evitar spam)
             if (element.valido !== false) {
                  Swal.fire({
-                    icon: "error",
-                    title: "Oops...",
-                    text: `El producto ${element.name} ya no tiene stock disponible.`,
-                });
+                     icon: "error",
+                     title: "Oops...",
+                     text: `El producto ${element.name} ya no tiene stock disponible.`,
+                 });
             }
         } else if (element.contador > producto_descontar.stock) {
             const stockAnterior = producto_descontar.stock;
@@ -446,8 +459,10 @@ function validar_productos() {
     if (producto_invalido) {
         return alert("Hay productos sin stock disponible en el carrito de compras. Por favor, elimínalos para continuar.");
     } else {
-        // Aquí iría la lógica de redirección o inicio de pago
-        // window.location.href = "/proceso/compra";
-        alert("¡Proceso de pago iniciado! Total: " + mostrar_total.textContent.replace('Pagar ', ''));
+        // **CORRECCIÓN RESTAURADA:** Redirección a la vista de pago
+        // Asegúrate de que esta ruta sea la correcta para tu vista de pago
+        window.location.href = "/proceso/compra"; // <-- ¡Redirección restaurada!
+        
+        // (La línea alert("¡Proceso de pago iniciado!...") que mandaba la alerta ha sido eliminada)
     }
 }
